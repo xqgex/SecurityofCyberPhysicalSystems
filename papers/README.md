@@ -9,7 +9,7 @@ Published: July 28, 1997 by [Simon J. Julier] and [Jeffrey K. Uhlmann].
 Links:
 
 * [PDF from unc.edu](https://www.cs.unc.edu/~welch/kalman/media/pdf/Julier1997_SPIE_KF.pdf)
-* [Mirror file](/papers/A New Extension of the Kalman Filter to Nonlinear Systems.pdf)
+* [Mirror file](/papers/A%20New%20Extension%20of%20the%20Kalman%20Filter%20to%20Nonlinear%20Systems.pdf)
 
 ### Citation
 
@@ -25,7 +25,7 @@ Published: October 4, 2000 by [Eric A. Wan] and [Rudolph van der Merwe].
 Links:
 
 * [PDF from unist.ac.kr](https://ai.unist.ac.kr/~chiu/robot/papers/UnsecentedKalmanFilter.pdf)
-* [Mirror file](/papers/The Unscented Kalman Filter for Nonlinear Estimation.pdf)
+* [Mirror file](/papers/The%20Unscented%20Kalman%20Filter%20for%20Nonlinear%20Estimation.pdf)
 
 ### Citation
 
