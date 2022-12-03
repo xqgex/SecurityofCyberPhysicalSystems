@@ -1,0 +1,8 @@
+/docs/build/
+/docs/source/_static/
+/docs/source/_templates/
+/docs/source/*.rst
+!/docs/source/index.rst
+src/temp_stored_values.csv
+__pycache__
+*.pyc
