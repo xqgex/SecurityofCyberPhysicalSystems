@@ -104,6 +104,10 @@ class UKF:
                 f'Expected {self.dimension_L}X{self.dimension_L} matrix\n' \
                 f'Got {len(self.process_noise_Q)}X{len(self.process_noise_Q)}')
 
+    def __str__(self) -> str:
+        """ A utility to represents the UKF instance. """
+        return '\n'.join([f'{a.name}: {self.__getattribute__(a.name)}' for a in self.__attrs_attrs__ if a.repr])
+
     def _predict_covariance_P(
             self,
             sigma_points_predict_X: Tuple[Vector, ...],
@@ -257,6 +261,10 @@ class UKF:
         > Predict the new state of the system :math:`\hat{x}_k^{-}` and its associated covariance :math:`P_k^{-}`.
         > This prediction must take account of the effects of process noise.
 
+        :note: The location where the noise is added cause an unsolvable bug. the process noise was moved from
+               `IMUVector.function_f()` to here `UKF().predict()`, both places are marked with a comment
+               `# XXX XXX XXX`.
+
         :equation:
 
         .. math::
@@ -275,6 +283,7 @@ class UKF:
         sigma_points_predict_X = self._predict_sigma_points_X(time_delta)
         mean_predict_x_k = self._predict_mean_x_k(sigma_points_predict_X)
         covariance_predict_P = self._predict_covariance_P(sigma_points_predict_X, mean_predict_x_k)
+        covariance_predict_P += time_delta * self.process_noise_Q  # XXX XXX XXX
         return sigma_points_predict_X, mean_predict_x_k, covariance_predict_P
 
     def step(self, time_delta: float, imu_vector: IMUVector) -> Tuple['UKF', float]:
@@ -301,6 +310,9 @@ class UKF:
         > This prediction should include the effects of observation noise.
         > Finally, predict the cross-correlation matrix :math:`P_{x_k y_k}`.
 
+        :note: The location where the noise is added cause an unsolvable bug. the measurements noise was moved from
+               `IMUVector.function_h()` to here `UKF().update()`, both places are marked with a comment `# XXX XXX XXX`.
+
         :equation:
 
         .. math::
@@ -317,6 +329,13 @@ class UKF:
              P_k &= P_k^{-} - \mathcal{K} P_{y_k y_k} \mathcal{K}^T
            \end{align*}
 
+        For evaluation purposes, the RMSE is calculated as follow:
+
+        :equation:
+
+        .. math::
+           RMSE = \sqrt{\frac{1}{m} \sum_{i=1}^{m} (y_{i,k} - \hat{y}_{i,k}^{-})^2}
+
         :param Tuple[Vector, ...] sigma_points_predict_X: The predicted sigma points X, 2L+1 vectors of size L.
         :param Vector mean_predict_x_k: The predicted mean, a vector of size L.
         :param SquareMatrix covariance_predict_P: SquareMatrix.
@@ -332,6 +351,7 @@ class UKF:
                                                                                  sigma_points_predict_Y,
                                                                                  mean_predict_x_k,
                                                                                  observation_predict_y_k)
+        innovation_covariance_predict_P_yy += imu_vector.measurement_noise_R  # XXX XXX XXX
         kalman_gain: Matrix = cross_correlation_predict_P_xy * innovation_covariance_predict_P_yy.inverse()
         y_diff = (imu_vector - observation_predict_y_k).to_minimal_vector()
         mean_x = mean_predict_x_k + (kalman_gain * y_diff).to_vector()

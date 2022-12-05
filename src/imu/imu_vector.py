@@ -24,27 +24,27 @@ class Noise(NamedTuple):
 
 
 _NOISE = {
-    'x': Noise(measurement=1., process=1.),
-    'y': Noise(measurement=1., process=1.),
-    'v_x': Noise(measurement=1., process=1.),
-    'v_y': Noise(measurement=1., process=1.),
-    'a_x': Noise(measurement=1., process=1.),
-    'a_y': Noise(measurement=1., process=1.),
+    'x': Noise(measurement=0.01, process=0.05),
+    'y': Noise(measurement=0.01, process=0.05),
+    'v_x': Noise(measurement=0.01, process=0.05),
+    'v_y': Noise(measurement=0.01, process=0.05),
+    'a_x': Noise(measurement=0.01, process=0.05),
+    'a_y': Noise(measurement=0.01, process=0.05),
     }
 
 
 @attr.s(frozen=True, kw_only=True, slots=True)
 class IMUVector:
-    """ Position vector.
+    """ The IMU vector describes the state of the system.
 
-    :math:`imu_vector = IMUVector(x,y,θ,v,a,ω)`
+    :math:`imu_vector = IMUVector(x,y,v_x,v_y,a_x,a_y)`
     where:
-    * `x` [m]: X position
-    * `y` [m]: Y position
-    * `v_x` [m/s]: Velocity in X axis
-    * `v_y` [m/s]: Velocity in Y axis
-    * `a_x` [m/s^2]: Acceleration in X axis (a = dv / dt)
-    * `a_y` [m/s^2]: Acceleration in Y axis (a = dv / dt)
+    * `x` [m]: Position in the X axis
+    * `y` [m]: Position in the Y axis
+    * `v_x` [m/s]: Velocity in the X axis
+    * `v_y` [m/s]: Velocity in the Y axis
+    * `a_x` [m/s^2]: Acceleration in X the axis (a = dv / dt)
+    * `a_y` [m/s^2]: Acceleration in Y the axis (a = dv / dt)
     """
 
     __dict__: Dict[str, Any] = attr.ib(
@@ -256,6 +256,9 @@ class IMUVector:
     def function_f(cls, vector: Vector, process_noise_Q: SquareMatrix, time_delta: float) -> Vector:
         """ Function :math:`F()` used for prediction based on time delta and the process noise.
 
+        :note: The location where the noise is added cause an unsolvable bug. the process noise was moved from here
+               `IMUVector.function_f()` to `UKF().predict()`, both places are marked with a comment `# XXX XXX XXX`.
+
         .. math::
            x - x_0 = v_0^{(x)} * t + 0.5 * a_0^{(x)} * t^2 \\
            y - y_0 = v_0^{(y)} * t + 0.5 * a_0^{(y)} * t^2 \\
@@ -270,12 +273,18 @@ class IMUVector:
             0.0,
             0.0,
             )
-        return vector + (process_noise_Q * Vector(values_update, orientation=VectorOrientation.VERTICAL))
+        return vector + Vector(values_update, orientation=VectorOrientation.VERTICAL)  # XXX XXX XXX
+#        return vector + (process_noise_Q * Vector(values_update, orientation=VectorOrientation.VERTICAL)).to_vector()  # XXX XXX XXX
 
     @classmethod
     def function_h(cls, vector: Vector, measurement_noise_R: SquareMatrix) -> Vector:
-        """ Function :math:`H()` is updating the prediction with the the measurements noise. """
-        return (measurement_noise_R * vector).column(0)
+        """ Function :math:`H()` is updating the prediction with the the measurements noise.
+
+        :note: The location where the noise is added cause an unsolvable bug. the measurements noise was moved from here
+               `IMUVector.function_h()` to `UKF().update()`, both places are marked with a comment `# XXX XXX XXX`.
+        """
+        return vector  # XXX XXX XXX
+#        return vector + (measurement_noise_R * vector).to_vector()  # XXX XXX XXX
 
     @classmethod
     def process_noise_Q(cls) -> SquareMatrix:

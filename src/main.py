@@ -7,7 +7,7 @@ https://github.com/xqgex/SecurityofCyberPhysicalSystems/blob/main/LICENSE
 
 from csv import DictReader, DictWriter
 from enum import auto, Enum
-from logging import basicConfig, debug, DEBUG, getLogger, info, INFO
+from logging import basicConfig, debug, DEBUG, error, getLogger, info, INFO
 from os import chdir
 from os.path import abspath, dirname
 from pathlib import Path
@@ -32,7 +32,16 @@ _CSV_HEADER_PREFIX_UKF = 'UKF_'
 _CSV_OPEN_ENCODING = 'utf-8'
 _CSV_READ_MODE = 'r'
 _CSV_WRITE_MODE = 'w'
-_MAX_MEASUREMENTS_TO_LOAD = 20000
+_INITIAL_COVARIANCE = [
+        [9.4e-03, -1.1e-15, 8.3e-03, 9.9e-18, 8.9e-05, 9.9e-20],
+        [-1.1e-15, 9.4e-03, -6.e-15, 8.3e-03, -6.7e-18, 8.9e-05],
+        [8.3e-03, -6.0e-15, 5.9e-02, 7.3e-18, 1.2e-03, 9.9e-20],
+        [9.9e-18, 8.3e-03, 7.3e-18, 5.9e-02, 9.2e-20, 1.2e-03],
+        [8.9e-05, -6.7e-18, 1.2e-03, 9.2e-20, 8.2e-03, 2.6e-21],
+        [9.9e-20, 8.9e-05, 9.9e-20, 1.2e-03, 2.6e-21, 8.2e-03],
+        ]
+_INITIAL_STATE = (2713., 213., 0.4, 0.2, 0.3, 0.1)
+_MAX_MEASUREMENTS_TO_LOAD = None
 _NUMBER_OF_ITERATIONS_BETWEEN_STATUS_PRINT = 1000
 _NUMBER_OF_MEASUREMENTS_TO_SKIP = 10000
 _PLOT_COLOR_DATA = 'b'
@@ -50,6 +59,8 @@ class _CSVHeader(Enum):
     UKF_POSITION_Y = auto()
     UKF_SPEED_X = auto()
     UKF_SPEED_Y = auto()
+    UKF_ACCELERATION_X = auto()
+    UKF_ACCELERATION_Y = auto()
     UKF_RMSE = auto()
 
     def __str__(self) -> str:
@@ -78,15 +89,30 @@ def _load_results_from_previous_run() -> _CSVData:
 
     :note: The function assume that all columns have the same length, if not, an error will be raised from `matplotlib`.
     """
-    debug('Loading data from CSV file')
+    debug(f'Loading data from CSV file `{_PREVIOUS_RUN_CSV_FILE_PATH}`')
     info('Skip UKF algorithm')
     csv_data = _CSVData({})
     with open(_PREVIOUS_RUN_CSV_FILE_PATH, encoding=_CSV_OPEN_ENCODING, mode=_CSV_READ_MODE) as infile:
         reader = DictReader(infile)
         for row in reader:
             for column_name, column_value in row.items():
-                csv_data.setdefault(column_name, []).append(column_value)  # Group the CSV file by columns
+                csv_data.setdefault(column_name, []).append(float(column_value))  # Group the CSV file by columns
     return csv_data
+
+
+def _load_test_data() -> _CSVData:
+    """ Load the test data into the `_CSVData` utility class. """
+    timestamps, relative_x, relative_y, acceleration_x, acceleration_y = get_test_data(
+        measurements_to_skip=_NUMBER_OF_MEASUREMENTS_TO_SKIP,
+        max_measurements_to_load=_MAX_MEASUREMENTS_TO_LOAD,
+        )
+    return _CSVData({
+        _CSVHeader.TIMESTAMP.name: timestamps,
+        _CSVHeader.DATA_POSITION_X.name: relative_x,
+        _CSVHeader.DATA_POSITION_Y.name: relative_y,
+        _CSVHeader.DATA_ACCELERATION_X.name: acceleration_x,
+        _CSVHeader.DATA_ACCELERATION_Y.name: acceleration_y,
+        })
 
 
 def _plot(csv_data: _CSVData) -> None:
@@ -96,7 +122,7 @@ def _plot(csv_data: _CSVData) -> None:
     """
     debug('Plotting')
     getLogger().setLevel(INFO)  # Suppress debug information from `matplotlib`
-    figure, axis = pyplot.subplots(nrows=2, ncols=2, figsize=(3, 3))
+    figure, axis = pyplot.subplots(nrows=3, ncols=2, figsize=(3, 3))
     figure.tight_layout()
     figure.suptitle('Test results')
     axis[0, 0].plot(csv_data[_CSVHeader.DATA_POSITION_X], csv_data[_CSVHeader.DATA_POSITION_Y], _PLOT_COLOR_DATA)
@@ -109,15 +135,23 @@ def _plot(csv_data: _CSVData) -> None:
     axis[0, 1].set_ylabel('RMSE')
     axis[0, 1].set_title('Root Mean Squared Error')
     axis[1, 0].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.UKF_SPEED_X], _PLOT_COLOR_UKF)
-    axis[1, 0].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.UKF_SPEED_Y], _PLOT_COLOR_UKF)
     axis[1, 0].set_xlabel('Time [second]')
     axis[1, 0].set_ylabel('Speed [m/s]')
-    axis[1, 0].set_title('Speed from UKF')
-    axis[1, 1].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.DATA_ACCELERATION_X], _PLOT_COLOR_DATA)
-    axis[1, 1].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.DATA_ACCELERATION_Y], _PLOT_COLOR_DATA)
+    axis[1, 0].set_title('Speed X axis')
+    axis[1, 1].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.UKF_SPEED_Y], _PLOT_COLOR_UKF)
     axis[1, 1].set_xlabel('Time [second]')
-    axis[1, 1].set_ylabel('Acceleration [m/s^2]')
-    axis[1, 1].set_title('Acceleration from data')
+    axis[1, 1].set_ylabel('Speed [m/s]')
+    axis[1, 1].set_title('Speed Y axis')
+    axis[2, 0].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.DATA_ACCELERATION_X], _PLOT_COLOR_DATA)
+    axis[2, 0].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.UKF_ACCELERATION_X], _PLOT_COLOR_UKF)
+    axis[2, 0].set_xlabel('Time [second]')
+    axis[2, 0].set_ylabel('Acceleration [m/s^2]')
+    axis[2, 0].set_title('Acceleration X axis')
+    axis[2, 1].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.DATA_ACCELERATION_Y], _PLOT_COLOR_DATA)
+    axis[2, 1].plot(csv_data[_CSVHeader.TIMESTAMP], csv_data[_CSVHeader.UKF_ACCELERATION_Y], _PLOT_COLOR_UKF)
+    axis[2, 1].set_xlabel('Time [second]')
+    axis[2, 1].set_ylabel('Acceleration [m/s^2]')
+    axis[2, 1].set_title('Acceleration Y axis')
     pyplot.show()
 
 
@@ -126,42 +160,31 @@ def _previous_run_csv_exists() -> bool:
     return Path(_PREVIOUS_RUN_CSV_FILE_PATH).resolve().is_file()
 
 
-def _run_ukf() -> _CSVData:
+def _run_ukf(run_data: _CSVData) -> _CSVData:
     """ Run the Unscented Kalman Filter on a given data. """
-    def _load_test_data() -> _CSVData:
-        timestamps, relative_x, relative_y, acceleration_x, acceleration_y = get_test_data(
-            measurements_to_skip=_NUMBER_OF_MEASUREMENTS_TO_SKIP,
-            max_measurements_to_load=_MAX_MEASUREMENTS_TO_LOAD,
-            )
-        return _CSVData({
-            _CSVHeader.TIMESTAMP.name: timestamps,
-            _CSVHeader.DATA_POSITION_X.name: relative_x,
-            _CSVHeader.DATA_POSITION_Y.name: relative_y,
-            _CSVHeader.DATA_ACCELERATION_X.name: acceleration_x,
-            _CSVHeader.DATA_ACCELERATION_Y.name: acceleration_y,
-            })
-    run_data = _load_test_data()
+    def _status_message(index: int, timestamp: float) -> str:
+        position_x = f'{run_data[_CSVHeader.DATA_POSITION_X][index]:.2f}'
+        position_y = f'{run_data[_CSVHeader.DATA_POSITION_Y][index]:.2f}'
+        return f'[{index:,}/{len(run_data[_CSVHeader.TIMESTAMP]):,}] Running UKF. ' \
+               f'Timestamp: {timestamp:.2f} sec. Vehicle location: ({position_x},{position_y})'
     for header in _CSVHeader:
         if header.is_ukf_field():
-            run_data[header] = []
+            run_data[header.name] = []
     debug(f'Loaded {len(run_data[_CSVHeader.TIMESTAMP]):,} timestamps from the test file')
     L = len(IMUVector.fields())  # [x, y, v_x, v_y, a_x, a_y]
     ukf = UKF(
-        covariance_P=SquareMatrix.diagonal(0.0001, L),  # Initial covariance
+        covariance_P=SquareMatrix.from_lists(_INITIAL_COVARIANCE),
         dimension_L=L,
         function_f=IMUVector.function_f,
         function_h=IMUVector.function_h,
-        mean_x=Vector.of_size(L),  # Initial state
+        mean_x=Vector(vector=_INITIAL_STATE, orientation=VectorOrientation.VERTICAL),
         process_noise_Q=IMUVector.process_noise_Q(),
         )
     debug('Starting UKF iterations')
     last_timestamp = None
     for data_index, timestamp in enumerate(run_data[_CSVHeader.TIMESTAMP]):
         if data_index % _NUMBER_OF_ITERATIONS_BETWEEN_STATUS_PRINT == 0:
-            position_x = f'{run_data[_CSVHeader.DATA_POSITION_X][data_index]:.2f}'
-            position_y = f'{run_data[_CSVHeader.DATA_POSITION_Y][data_index]:.2f}'
-            debug(f'[{data_index:,}/{len(run_data[_CSVHeader.TIMESTAMP]):,}] Running UKF. ' \
-                  f'Timestamp: {timestamp:.1f} sec. Vehicle location: ({position_x},{position_y})')
+            debug(_status_message(data_index, timestamp))
         time_delta = timestamp - last_timestamp if last_timestamp is not None else 0.0
         last_timestamp = timestamp
         imu_vector = IMUVector(
@@ -170,23 +193,30 @@ def _run_ukf() -> _CSVData:
             a_x=run_data[_CSVHeader.DATA_ACCELERATION_X][data_index],
             a_y=run_data[_CSVHeader.DATA_ACCELERATION_Y][data_index],
             )
-        ukf, rmse_value = ukf.step(time_delta=time_delta, imu_vector=imu_vector)
+        try:
+            ukf, rmse_value = ukf.step(time_delta=time_delta, imu_vector=imu_vector)
+        except Exception as e:
+            error(_status_message(data_index, timestamp))
+            raise RuntimeError(f'Execution of the Unscented Kalman Filter algorithm failed.\n{ukf}\n') from e
         ukf_state = IMUVector.from_vector(ukf.mean_x)
         run_data[_CSVHeader.UKF_POSITION_X].append(ukf_state.x)
         run_data[_CSVHeader.UKF_POSITION_Y].append(ukf_state.y)
         run_data[_CSVHeader.UKF_SPEED_X].append(ukf_state.v_x)
         run_data[_CSVHeader.UKF_SPEED_Y].append(ukf_state.v_y)
+        run_data[_CSVHeader.UKF_ACCELERATION_X].append(ukf_state.a_x)
+        run_data[_CSVHeader.UKF_ACCELERATION_Y].append(ukf_state.a_y)
         run_data[_CSVHeader.UKF_RMSE].append(rmse_value)
     return run_data
 
 
 def _save_data_to_csv(csv_data: _CSVData) -> None:
     """ Save the UKF results to a CSV file. """
-    debug('Saving data to a CSV file')
+    debug(f'Saving data to CSV file `{_PREVIOUS_RUN_CSV_FILE_PATH}`')
     with open(_PREVIOUS_RUN_CSV_FILE_PATH, encoding=_CSV_OPEN_ENCODING, mode=_CSV_WRITE_MODE) as oufile:
         writer = DictWriter(oufile, csv_data.keys())
         writer.writeheader()
-        writer.writerows(csv_data)
+        rows = [{k: csv_data[k][i] for k in csv_data.keys()} for i in range(len(csv_data[_CSVHeader.TIMESTAMP]))]
+        writer.writerows(rows)
 
 
 if __name__ == '__main__':
@@ -194,7 +224,8 @@ if __name__ == '__main__':
     if _previous_run_csv_exists():
         _csv_data = _load_results_from_previous_run()
     else:
-        _csv_data = _run_ukf()
+        _csv_data = _run_ukf(_load_test_data())
         _save_data_to_csv(_csv_data)
-    _plot(_csv_data)
+    if _csv_data:
+        _plot(_csv_data)
     debug('Finished')
