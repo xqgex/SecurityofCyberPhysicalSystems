@@ -226,6 +226,10 @@ class Matrix(_Base):
     def expand_with_indices(self, _1: Tuple[int, ...], _2: int) -> 'Matrix':
         raise ValueError(f'Cannot expand non square matrix.\n{self}')
 
+    def is_zero_matrix(self) -> bool:
+        """ Return True if all of the matrix values are 0 and False o.w. """
+        return all(c == 0. for r in self for c in r)
+
     def row(self, index: int) -> Vector:
         """ Explicit function equivalent to `self[index]`. """
         return self[index]

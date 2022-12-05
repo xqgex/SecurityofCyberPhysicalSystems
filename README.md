@@ -56,6 +56,16 @@ $ google-chrome ./docs/build/html/index.html
 $ firefox ./docs/build/html/index.html
 ```
 
+## Run examples
+
+### All measurements
+
+<img src="/images/Figure_1_0-144036.png" alt="All measurements" width="800" />
+
+### Measurements 10,000 to 15,000
+
+<img src="/images/Figure_2_10000-15000.png" alt="Measurements 10,000 to 15,000" width="800" />
+
 ## Side note
 
 As part of this project, several tools/tutorials were built for converting formats, e.g.

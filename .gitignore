@@ -3,6 +3,6 @@
 /docs/source/_templates/
 /docs/source/*.rst
 !/docs/source/index.rst
-src/temp_stored_values.csv
+/src/previous_run_results.csv
 __pycache__
 *.pyc

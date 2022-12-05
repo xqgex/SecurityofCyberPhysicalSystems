@@ -24,8 +24,9 @@ _CSV_OPEN_ENCODING = 'utf-8'
 _CSV_READ_MODE = 'r'
 _EARTH_RADIUS_KM = 6371
 _IMAGE_SIZE_METER = 2800
-_MAP_CORNER_BOTTOM_RIGHT = _Coordinate(latitude=-27.720931, longitude=-51.143431)
-_MAP_CORNER_TOP_LEFT = _Coordinate(latitude=-27.680405, longitude=-51.097423)
+_MAP_CORNER_BOTTOM_LEFT = _Coordinate(latitude=-27.720931, longitude=-51.143431)
+_MAP_CORNER_TOP_RIGHT = _Coordinate(latitude=-27.680405, longitude=-51.097423)
+_TIMESTAMP_PRECISION = 2
 
 
 class _Point:  # pylint: disable=too-few-public-methods
@@ -38,7 +39,7 @@ class _Point:  # pylint: disable=too-few-public-methods
     @classmethod
     def from_coordinate(cls, coordinate: _Coordinate) -> '_Point':
         """ Create an (x,y) point from earth coordinate `latitude,longitude`. """
-        x_average = (_MAP_CORNER_TOP_LEFT.latitude + _MAP_CORNER_BOTTOM_RIGHT.latitude) / 2
+        x_average = (_MAP_CORNER_TOP_RIGHT.latitude + _MAP_CORNER_BOTTOM_LEFT.latitude) / 2
         x = _EARTH_RADIUS_KM * coordinate.longitude * cos(x_average)
         y = _EARTH_RADIUS_KM * coordinate.latitude
         return cls(x, y)
@@ -46,9 +47,9 @@ class _Point:  # pylint: disable=too-few-public-methods
 
 class _RelativeXY:  # pylint: disable=too-few-public-methods
     def __init__(self) -> None:
-        self._earth_bottom_right = _Point.from_coordinate(_MAP_CORNER_BOTTOM_RIGHT)
+        self._earth_bottom_right = _Point.from_coordinate(_MAP_CORNER_BOTTOM_LEFT)
         self._screen_bottom_right = _Point(x=0.0, y=0.0)
-        self._earth_top_left = _Point.from_coordinate(_MAP_CORNER_TOP_LEFT)
+        self._earth_top_left = _Point.from_coordinate(_MAP_CORNER_TOP_RIGHT)
         self._screen_top_left = _Point(x=_IMAGE_SIZE_METER, y=_IMAGE_SIZE_METER)
 
     def x_y_for_earth_coordinate(self, coordinate: _Coordinate) -> _Point:
@@ -96,7 +97,7 @@ def get_test_data(
     4. Acceleration X axis
     5. Acceleration Y axis
 
-    :param int measurements_to_skip: If set, the first selected number of measurements will be skipped.
+    :param int measurements_to_skip: If greater than 0, the first selected number of measurements will be skipped.
     :param Optional[int] max_measurements_to_load: If set, the maximum number of measurements will be limited.
     :returns: The data from the dataset.
     :rtype: Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[float, ...], Tuple[float, ...], Tuple[float, ...]]
@@ -117,7 +118,7 @@ def get_test_data(
             acceleration_y.append(float(row[_CSV_HEADER_ACCELERATION_Y]))
             if timestamp_t_0 is None:
                 timestamp_t_0 = float(row[_CSV_HEADER_TIMESTAMP])
-            timestamps.append(float(row[_CSV_HEADER_TIMESTAMP]) - timestamp_t_0)
+            timestamps.append(round(float(row[_CSV_HEADER_TIMESTAMP]) - timestamp_t_0, _TIMESTAMP_PRECISION))
             coordinate = _Coordinate(float(row[_CSV_HEADER_LATITUDE]), float(row[_CSV_HEADER_LONGITUDE]))
             point = relative_world.x_y_for_earth_coordinate(coordinate)
             relative_x.append(point.x)

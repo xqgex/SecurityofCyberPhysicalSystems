@@ -71,6 +71,8 @@ class SquareMatrix(Matrix):
         .. math::
            LL^{T} = A \Rightarrow \sqrt{A} = L
         """
+        if self.is_zero_matrix():
+            return SquareMatrix.of_size(len(self))  # The square root of the zero matrix is a zero matrix
         if any(self[i][i] == 0.0 for i in range(len(self))):
             raise ValueError(f'Cannot calculate square root for square matrix with zero(s) on the diagonal.\n{self}')
         return SquareMatrix.from_lists(square_root_cholesky_banachiewicz(tuple(map(tuple, self))))
